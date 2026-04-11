@@ -3,6 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/cime-sdk.svg)](https://www.npmjs.com/package/cime-sdk)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+![npm](https://img.shields.io/npm/dt/cime-sdk)
 
 **ci.me API를 위한 TypeScript SDK**입니다.
 Node.js 환경만을 지원합니다.
