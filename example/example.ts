@@ -10,6 +10,8 @@ const client = new CimeClient({
     accessToken: 'YOUR_ACCESS_TOKEN', // 이미 발급된 토큰이 있다면 바로 사용
 });
 
+const tokenResponse = await client.authorize('code');
+
 async function runBot() {
     try {
         // ====================================================================
@@ -73,17 +75,17 @@ runBot();
 
 // ============================================================================
 // 💡 [참고] OAuth 콜백 라우트 예시 (Express.js 등 웹 서버 환경)
-// 개발자가 복잡한 토큰 발급 로직을 구현할 필요 없이 `authorize` 하나로 끝납니다.
 // ============================================================================
 /*
 app.get('/oauth/callback', async (req, res) => {
     const code = req.query.code as string;
     try {
-        // 인가 코드로 Access / Refresh Token을 발급받고 자동으로 client에 적용합니다.
+        // 인가 코드로 Access / Refresh Token / scopes 을 발급받고 자동으로 client에 적용합니다.
         const tokenResponse = await client.authorize(code);
         
-        // 발급된 리프레시 토큰은 DB 등에 저장하여 추후 자동 갱신에 사용하세요!
-        // db.save('user_refresh_token', tokenResponse.refreshToken);
+        // 발급된 토큰 및 scopes는 DB 등에 저장하여 추후 자동 갱신에 사용하세요!
+        // db.save('user_token', tokenResponse);
+        // db.save('user_scopes', tokenResponse.scope.split(' '));
         
         res.send('인증 성공! 이제 봇이 동작합니다.');
     } catch (error) {
