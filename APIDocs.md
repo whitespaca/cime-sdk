@@ -155,7 +155,7 @@
 
 ---
 
-## 웹소켓 (CimeEventClient)
+## Websocket (CimeEventClient)
 
 ✅ Access Token
 
