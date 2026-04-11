@@ -1,6 +1,6 @@
 {
   "name": "cime-sdk",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "A structural and object-oriented TypeScript SDK for ci.me API",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
