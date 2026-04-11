@@ -1,6 +1,6 @@
 {
   "name": "cime-sdk",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A structural and object-oriented TypeScript SDK for ci.me API",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -21,10 +21,17 @@
     "test": "vitest",
     "typecheck": "tsc --noEmit"
   },
-  "keywords": ["cime", "sdk", "typescript"],
+  "keywords": [
+    "cime",
+    "sdk",
+    "typescript"
+  ],
   "author": "whitespaca",
   "license": "MIT",
-  "repository": {"type": "git", "url": "https://github.com/whitespaca/cime-sdk" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/whitespaca/cime-sdk"
+  },
   "type": "commonjs",
   "dependencies": {
     "axios": "^1.15.0",
