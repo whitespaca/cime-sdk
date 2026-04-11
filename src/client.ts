@@ -55,6 +55,10 @@ export class CimeClient {
         this.options.refreshToken = token;
     }
 
+    public setScopes(scopes: string[]): void {
+        this.options.scopes = scopes;
+    }
+
     /**
      * 실시간 이벤트를 수신하기 위한 WebSocket 클라이언트를 생성합니다.
      * 치지직의 chatClient와 같은 역할을 하는 메서드입니다.
@@ -86,7 +90,7 @@ export class CimeClient {
         const tokenResponse = await this.auth.get(code);
         this.setAccessToken(tokenResponse.accessToken);
         this.setRefreshToken(tokenResponse.refreshToken);
-        this.options.scopes = tokenResponse.scope.split(' ');
+        this.setScopes(tokenResponse.scope.split(' '));
         return tokenResponse;
     }
 }
