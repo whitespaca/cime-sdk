@@ -14,7 +14,7 @@ export class AuthAPI {
     public async get(code: string): Promise<CimeTokenResponse> {
         this.validateCredentials();
 
-        const { data } = await this.http.post<CimeTokenResponse>('/auth/v1/token', {
+        const data = await this.http.post<any, CimeTokenResponse>('/auth/v1/token', {
             grantType: 'authorization_code',
             clientId: this.config.clientId,
             clientSecret: this.config.clientSecret,
@@ -31,11 +31,11 @@ export class AuthAPI {
     public async refresh(refreshToken: string): Promise<CimeTokenResponse> {
         this.validateCredentials();
 
-        const { data } = await this.http.post<CimeTokenResponse>('/auth/v1/token', {
+        const data = await this.http.post<any, CimeTokenResponse>('/auth/v1/token', {
             grantType: 'refresh_token',
             clientId: this.config.clientId,
             clientSecret: this.config.clientSecret,
-            refreshToken
+            refreshToken: refreshToken
         });
 
         return data;
