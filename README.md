@@ -12,6 +12,8 @@ Node.js 환경만을 지원합니다.
 
 ## 📦 설치
 
+cime-sdk는 [npm](https://www.npmjs.com/package/cime-sdk)에 등록되어 있습니다.
+
 ```bash
 # npm
 npm install cime-sdk
@@ -25,7 +27,7 @@ pnpm add cime-sdk
 
 ---
 
-## 사용법
+## 🛠️ 사용법
 
 ### CimeClient (초기화)
 
