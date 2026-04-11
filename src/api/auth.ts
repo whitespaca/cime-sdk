@@ -18,7 +18,7 @@ export class AuthAPI {
             grantType: 'authorization_code',
             clientId: this.config.clientId,
             clientSecret: this.config.clientSecret,
-            code
+            code: code
         });
 
         return data;

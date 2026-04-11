@@ -135,7 +135,7 @@ describe('Cime SDK - Unit Tests', () => {
             const result = await client.authorize('test_auth_code');
 
             // 정확한 파라미터로 POST 요청이 갔는지 확인
-            expect(mockPost).toHaveBeenCalledWith('/api/openapi/auth/v1/token', {
+            expect(mockPost).toHaveBeenCalledWith('/auth/v1/token', {
                 grantType: 'authorization_code',
                 clientId: 'my_id',
                 clientSecret: 'my_secret',
