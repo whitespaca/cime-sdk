@@ -51,8 +51,13 @@ export class CimeClient {
         // httpClient 내부의 options 참조는 객체 참조이므로 속성만 바꿔주면 다음 요청부터 자동으로 반영됩니다.
     }
 
+    public setRefreshToken(token: string): void {
+        this.options.refreshToken = token;
+    }
+
     /**
      * 실시간 이벤트를 수신하기 위한 WebSocket 클라이언트를 생성합니다.
+     * 치지직의 chatClient와 같은 역할을 하는 메서드입니다.
      */
     public createEventClient(options: CimeEventClientOptions): CimeEventClient {
         if (options.refreshToken && !options.onTokenRefresh) {
@@ -80,6 +85,8 @@ export class CimeClient {
 
         const tokenResponse = await this.auth.get(code);
         this.setAccessToken(tokenResponse.accessToken);
+        this.setRefreshToken(tokenResponse.refreshToken);
+        this.options.scopes = tokenResponse.scope.split(' ');
         return tokenResponse;
     }
 }
