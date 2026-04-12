@@ -1,6 +1,6 @@
 {
   "name": "cime-sdk",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "방송 플랫폼 씨미의 비공식 SDK입니다. 공식 API를 기반으로 합니다.",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
