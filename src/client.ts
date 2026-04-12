@@ -64,12 +64,12 @@ export class CimeClient {
      * 치지직의 chatClient와 같은 역할을 하는 메서드입니다.
      */
     public createEventClient(options: CimeEventClientOptions): CimeEventClient {
-        if (options.refreshToken && !options.onTokenRefresh) {
+        if ((options.refreshToken || this.options.refreshToken) && !options.onTokenRefresh) {
             options.onTokenRefresh = async () => {
                 try {
-                    const tokenInfo = await this.auth.refresh(options.refreshToken!);
+                    const tokenInfo = await this.auth.refresh(options.refreshToken || this.options.refreshToken!);
                     this.setAccessToken(tokenInfo.accessToken);
-                    options.refreshToken = tokenInfo.refreshToken;
+                    this.setRefreshToken(tokenInfo.refreshToken);
                 } catch (error) {
                     throw new Error('자동 토큰 갱신에 실패했습니다.');
                 }
