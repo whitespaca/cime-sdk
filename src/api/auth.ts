@@ -1,7 +1,16 @@
 import { AxiosInstance } from 'axios';
 import { CimeTokenResponse } from '../types/auth';
 
+/**
+ * ci.me OpenAPI의 OAuth 토큰 발급 및 갱신 요청을 담당합니다.
+ */
 export class AuthAPI {
+    /**
+     * 공유 HTTP 클라이언트를 사용하는 인증 API 래퍼를 생성합니다.
+     *
+     * @param http 공유 Axios 인스턴스
+     * @param config OAuth 애플리케이션 인증 정보
+     */
     constructor(
         private readonly http: AxiosInstance,
         private readonly config: { clientId?: string; clientSecret?: string }

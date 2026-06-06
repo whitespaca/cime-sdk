@@ -1,4 +1,13 @@
+/**
+ * 세션 인증 방식입니다.
+ *
+ * `USER` 세션은 현재 Access Token을 사용하고, `CLIENT` 세션은 애플리케이션 Client Credential을 사용합니다.
+ */
 export type CimeSessionType = 'USER' | 'CLIENT';
+
+/**
+ * 세션 REST API에서 사용하는 이벤트 구독 이름입니다.
+ */
 export type CimeEventName = 'chat' | 'donation' | 'subscription';
 
 /**
@@ -13,7 +22,9 @@ export interface CimeSessionResponse {
  * 수신되는 실시간 이벤트 데이터의 공통 구조
  */
 export interface CimeEventPayload<T = any> {
+    /** 실시간 이벤트 이름입니다. */
     event: 'CHAT' | 'DONATION' | 'SUBSCRIPTION';
+    /** 이벤트별 페이로드입니다. */
     data: T;
 }
 

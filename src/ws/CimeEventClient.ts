@@ -6,26 +6,46 @@ import { CimeChatEventData } from '../types/chat';
 import { CimeDonationEventData } from '../types/donation';
 import { CimeSubscriptionEventData } from '../types/subscription';
 
+/**
+ * {@link CimeEventClient}가 지원하는 실시간 이벤트 이름입니다.
+ */
 export type CimeLiveEventName = 'CHAT' | 'DONATION' | 'SUBSCRIPTION';
 
+/**
+ * {@link CimeEventClient}가 발생시키는 타입 지정 이벤트 오버로드입니다.
+ */
 export declare interface CimeEventClient {
+    /** CHAT 이벤트 리스너를 등록합니다. */
     on(event: 'CHAT', listener: (data: CimeChatEventData) => void): this;
+    /** DONATION 이벤트 리스너를 등록합니다. */
     on(event: 'DONATION', listener: (data: CimeDonationEventData) => void): this;
+    /** SUBSCRIPTION 이벤트 리스너를 등록합니다. */
     on(event: 'SUBSCRIPTION', listener: (data: CimeSubscriptionEventData) => void): this;
     
+    /** WebSocket 연결이 열린 뒤 호출되는 리스너를 등록합니다. */
     on(event: 'connected', listener: () => void): this;
+    /** WebSocket 연결이 닫힌 뒤 호출되는 리스너를 등록합니다. */
     on(event: 'disconnected', listener: () => void): this;
+    /** 오류 리스너를 등록합니다. */
     on(event: 'error', listener: (error: Error) => void): this;
+    /** 자동 재연결 시도 전에 호출되는 리스너를 등록합니다. */
     on(event: 'reconnecting', listener: () => void): this;
     on(event: string | symbol, listener: (...args: any[]) => void): this;
 
+    /** CHAT 이벤트를 발생시킵니다. */
     emit(event: 'CHAT', data: CimeChatEventData): boolean;
+    /** DONATION 이벤트를 발생시킵니다. */
     emit(event: 'DONATION', data: CimeDonationEventData): boolean;
+    /** SUBSCRIPTION 이벤트를 발생시킵니다. */
     emit(event: 'SUBSCRIPTION', data: CimeSubscriptionEventData): boolean;
     
+    /** connected 생명주기 이벤트를 발생시킵니다. */
     emit(event: 'connected'): boolean;
+    /** disconnected 생명주기 이벤트를 발생시킵니다. */
     emit(event: 'disconnected'): boolean;
+    /** error 생명주기 이벤트를 발생시킵니다. */
     emit(event: 'error', error: Error): boolean;
+    /** reconnecting 생명주기 이벤트를 발생시킵니다. */
     emit(event: 'reconnecting'): boolean;
     emit(event: string | symbol, ...args: any[]): boolean;
 }
@@ -44,6 +64,12 @@ export class CimeEventClient extends EventEmitter {
     
     private readonly activeSubscriptions = new Set<CimeLiveEventName>();
 
+    /**
+     * 실시간 이벤트 클라이언트를 생성합니다.
+     *
+     * @param sessionsApi WebSocket 세션 생성과 구독 관리에 사용하는 세션 API
+     * @param options 이벤트 클라이언트 동작 및 인증 옵션
+     */
     constructor(
         private readonly sessionsApi: SessionsAPI,
         private readonly options: CimeEventClientOptions
@@ -51,6 +77,9 @@ export class CimeEventClient extends EventEmitter {
         super();
     }
 
+    /**
+     * WebSocket 연결을 열고 기존에 요청한 이벤트를 다시 구독합니다.
+     */
     public async connect(): Promise<void> {
         if (this.isConnecting || this.ws?.readyState === WebSocket.OPEN) return;
         this.isConnecting = true;
@@ -135,6 +164,9 @@ export class CimeEventClient extends EventEmitter {
         }
     }
 
+    /**
+     * WebSocket 연결을 닫고 활성 구독 목록을 비웁니다.
+     */
     public disconnect(): void {
         this.isIntentionalClose = true;
         this.activeSubscriptions.clear();

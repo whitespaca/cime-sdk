@@ -5,6 +5,12 @@ import { CimeUser, CimeClientOptions } from '../types';
  * 사용자(User) 관련 API를 담당하는 클래스입니다.
  */
 export class UsersAPI {
+    /**
+     * 공유 HTTP 클라이언트를 사용하는 사용자 API 래퍼를 생성합니다.
+     *
+     * @param httpClient ci.me 인증 설정이 적용된 Axios 인스턴스
+     * @param options Scope 검증에 사용하는 클라이언트 옵션
+     */
     constructor(private readonly httpClient: AxiosInstance, private readonly options: CimeClientOptions) {}
 
     /**

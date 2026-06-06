@@ -15,6 +15,12 @@ import {
  * 채널 정보, 팔로워, 구독자, 관리자 목록 조회 기능을 제공합니다.
  */
 export class ChannelsAPI {
+    /**
+     * 공유 HTTP 클라이언트를 사용하는 채널 API 래퍼를 생성합니다.
+     *
+     * @param httpClient ci.me 인증 설정이 적용된 Axios 인스턴스
+     * @param options Scope 검증에 사용하는 클라이언트 옵션
+     */
     constructor(private readonly httpClient: AxiosInstance, private readonly options: CimeClientOptions) {}
 
     /**

@@ -5,6 +5,11 @@ import { CimeSessionResponse, CimeSessionType, CimeEventName } from '../types';
  * 세션(Session) 및 이벤트 구독 제어를 담당하는 클래스입니다.
  */
 export class SessionsAPI {
+    /**
+     * 공유 HTTP 클라이언트를 사용하는 세션 API 래퍼를 생성합니다.
+     *
+     * @param httpClient ci.me 인증 설정이 적용된 Axios 인스턴스
+     */
     constructor(private readonly httpClient: AxiosInstance) {}
 
     /**
