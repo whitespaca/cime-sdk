@@ -1,124 +1,371 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CimeClient } from '../src/client';
+import type { CimeDonationEventData } from '../src/types';
 import { renderChatEmojisToHTML } from '../src/utils/chatUtils';
 
-// ---------------------------------------------------------------------------
-// 1. Axios 및 네트워크 모듈 모킹 (Mocking)
-// ---------------------------------------------------------------------------
 const mockGet = vi.fn();
 const mockPost = vi.fn();
 const mockPut = vi.fn();
 const mockDelete = vi.fn();
 const mockPatch = vi.fn();
 
-vi.mock('axios', () => {
-    return {
-        default: {
-            create: vi.fn(() => ({
-                get: mockGet,
-                post: mockPost,
-                put: mockPut,
-                delete: mockDelete,
-                patch: mockPatch,
-                interceptors: {
-                    request: { use: vi.fn() },
-                    response: { use: vi.fn() },
-                },
-                defaults: { headers: {} },
-            })),
-        },
-    };
-});
+vi.mock('axios', () => ({
+    default: {
+        create: vi.fn(() => ({
+            get: mockGet,
+            post: mockPost,
+            put: mockPut,
+            delete: mockDelete,
+            patch: mockPatch,
+            interceptors: {
+                request: { use: vi.fn() },
+                response: { use: vi.fn() },
+            },
+            defaults: { headers: {} },
+        })),
+    },
+}));
 
 vi.mock('axios-retry', () => ({ default: vi.fn() }));
 
-// ---------------------------------------------------------------------------
-// 2. 테스트 스위트 (Test Suites)
-// ---------------------------------------------------------------------------
-describe('Cime SDK - Unit Tests', () => {
+describe('Cime SDK', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
-    describe('1. CimeClient 초기화', () => {
-        it('인증 정보(accessToken 또는 clientId/Secret)가 없으면 에러를 던져야 합니다.', () => {
-            // @ts-ignore (런타임 에러 발생 유도)
+    describe('CimeClient', () => {
+        it('requires either accessToken or clientId/clientSecret.', () => {
+            // @ts-expect-error Runtime validation is the behavior under test.
             expect(() => new CimeClient({})).toThrowError(/Authentication credentials/);
         });
 
-        it('accessToken으로 성공적으로 초기화되어야 합니다.', () => {
-            const client = new CimeClient({ accessToken: 'test_token' });
+        it('initializes every API module with an access token.', () => {
+            const client = new CimeClient({ accessToken: 'token' });
+
+            expect(client.auth).toBeDefined();
             expect(client.users).toBeDefined();
+            expect(client.channels).toBeDefined();
             expect(client.live).toBeDefined();
+            expect(client.chat).toBeDefined();
+            expect(client.categories).toBeDefined();
             expect(client.restrict).toBeDefined();
+            expect(client.sessions).toBeDefined();
+            expect(client.drops).toBeDefined();
         });
 
-        it('clientId와 clientSecret만으로도 성공적으로 초기화되어야 합니다.', () => {
+        it('initializes with client credentials only.', () => {
             const client = new CimeClient({ clientId: 'id', clientSecret: 'secret' });
+
             expect(client.auth).toBeDefined();
+            expect(client.channels).toBeDefined();
+            expect(client.drops).toBeDefined();
+        });
+
+        it('authorize() exchanges code and updates SDK scopes.', async () => {
+            const client = new CimeClient({ clientId: 'id', clientSecret: 'secret' });
+
+            mockPost.mockResolvedValueOnce({
+                accessToken: 'new-access-token',
+                refreshToken: 'new-refresh-token',
+                expiresIn: 3600,
+                tokenType: 'Bearer',
+                scope: 'WRITE:LIVE_CHAT READ:USER',
+            });
+            mockPost.mockResolvedValueOnce({ messageId: 'message-id' });
+
+            const token = await client.authorize('auth-code');
+            const message = await client.chat.sendMessage({ message: 'hello', senderType: 'APP' });
+
+            expect(mockPost).toHaveBeenNthCalledWith(1, '/auth/v1/token', {
+                grantType: 'authorization_code',
+                clientId: 'id',
+                clientSecret: 'secret',
+                code: 'auth-code',
+            });
+            expect(mockPost).toHaveBeenNthCalledWith(2, '/open/v1/chats/send', {
+                message: 'hello',
+                senderType: 'APP',
+            });
+            expect(token.accessToken).toBe('new-access-token');
+            expect(message).toEqual({ messageId: 'message-id' });
         });
     });
 
-    describe('2. 권한(Scope) 검증 로직', () => {
-        it('필요한 Scope가 누락된 경우 서버로 요청을 보내기 전에 에러를 던져야 합니다.', async () => {
-            // READ:USER 스코프가 없는 상태로 UsersAPI 호출
-            const client = new CimeClient({ accessToken: 'test_token', scopes: [] });
+    describe('auth', () => {
+        it('get() calls the token endpoint with authorization_code grant.', async () => {
+            const client = new CimeClient({ clientId: 'id', clientSecret: 'secret' });
+            mockPost.mockResolvedValueOnce({ accessToken: 'token' });
 
-            await expect(client.users.get()).rejects.toThrowError(
-                /\[UsersAPI\] "READ:USER" 권한이 필요합니다/
-            );
-            
-            // HTTP 요청이 발생하지 않았는지 검증 (Fail-fast)
+            const result = await client.auth.get('code');
+
+            expect(mockPost).toHaveBeenCalledWith('/auth/v1/token', {
+                grantType: 'authorization_code',
+                clientId: 'id',
+                clientSecret: 'secret',
+                code: 'code',
+            });
+            expect(result).toEqual({ accessToken: 'token' });
+        });
+
+        it('refresh() calls the token endpoint with refresh_token grant.', async () => {
+            const client = new CimeClient({ clientId: 'id', clientSecret: 'secret' });
+            mockPost.mockResolvedValueOnce({ accessToken: 'next-token' });
+
+            const result = await client.auth.refresh('refresh-token');
+
+            expect(mockPost).toHaveBeenCalledWith('/auth/v1/token', {
+                grantType: 'refresh_token',
+                clientId: 'id',
+                clientSecret: 'secret',
+                refreshToken: 'refresh-token',
+            });
+            expect(result).toEqual({ accessToken: 'next-token' });
+        });
+
+        it('fails fast when OAuth client credentials are missing.', async () => {
+            const client = new CimeClient({ accessToken: 'token' });
+
+            await expect(client.auth.get('code')).rejects.toThrow(/clientId.*clientSecret/);
+            expect(mockPost).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('users', () => {
+        it('requires READ:USER before sending a request.', async () => {
+            const client = new CimeClient({ accessToken: 'token', scopes: [] });
+
+            await expect(client.users.get()).rejects.toThrow(/\[UsersAPI\] "READ:USER"/);
             expect(mockGet).not.toHaveBeenCalled();
         });
 
-        it('다른 모듈에서도 Scope 누락 시 동일하게 작동해야 합니다 (RestrictAPI).', async () => {
-            const client = new CimeClient({ accessToken: 'test_token', scopes: ['READ:USER'] });
+        it('gets the current user.', async () => {
+            const client = new CimeClient({ accessToken: 'token', scopes: ['READ:USER'] });
+            mockGet.mockResolvedValueOnce({ channelId: 'channel-id', channelName: 'name' });
 
-            // WRITE:USER_BLOCK 스코프가 없으므로 실패해야 함
-            await expect(client.restrict.restrictUser({ targetChannelId: '123' })).rejects.toThrowError(
-                /\[RestrictAPI\] "WRITE:USER_BLOCK" 권한이 필요합니다/
-            );
-        });
+            const user = await client.users.get();
 
-        it('적절한 Scope가 포함되어 있으면 정상적으로 API 요청을 수행해야 합니다.', async () => {
-            const client = new CimeClient({ 
-                accessToken: 'test_token', 
-                scopes: ['READ:USER'] 
-            });
-            
-            mockGet.mockResolvedValueOnce({ channelId: '12345', channelName: '테스트' });
-
-            const result = await client.users.get();
-
-            expect(mockGet).toHaveBeenCalledTimes(1);
             expect(mockGet).toHaveBeenCalledWith('/open/v1/users/me');
-            expect(result).toEqual({ channelId: '12345', channelName: '테스트' });
+            expect(user).toEqual({ channelId: 'channel-id', channelName: 'name' });
         });
     });
 
-    describe('3. 특수 API 파라미터 변환 검증', () => {
-        it('ChannelsAPI.getChannels()가 배열을 전달받으면 쉼표로 구분된 문자열로 변환해야 합니다.', async () => {
+    describe('channels', () => {
+        it('converts channel ID arrays into comma-separated query params.', async () => {
             const client = new CimeClient({ clientId: 'id', clientSecret: 'secret' });
             mockGet.mockResolvedValueOnce({ data: [] });
 
             await client.channels.getChannels(['id1', 'id2', 'id3']);
 
             expect(mockGet).toHaveBeenCalledWith('/open/v1/channels', {
-                params: { channelIds: 'id1,id2,id3' }
+                params: { channelIds: 'id1,id2,id3' },
             });
         });
 
-        it('ChatAPI.registerNotice()가 파라미터가 모두 누락된 경우 에러를 던져야 합니다.', async () => {
-            const client = new CimeClient({ accessToken: 'test_token', scopes: ['WRITE:LIVE_CHAT_NOTICE'] });
+        it('gets followers with READ:CHANNEL.', async () => {
+            const client = new CimeClient({ accessToken: 'token', scopes: ['READ:CHANNEL'] });
+            mockGet.mockResolvedValueOnce({ data: [] });
 
-            await expect(client.chat.registerNotice({})).rejects.toThrowError(
-                /registerNotice requires either "message" or "messageId"/
+            await client.channels.getFollowers({ page: 1, size: 20 });
+
+            expect(mockGet).toHaveBeenCalledWith('/open/v1/channels/followers', {
+                params: { page: 1, size: 20 },
+            });
+        });
+
+        it('gets subscribers with READ:SUBSCRIPTION.', async () => {
+            const client = new CimeClient({ accessToken: 'token', scopes: ['READ:SUBSCRIPTION'] });
+            mockGet.mockResolvedValueOnce({ data: [] });
+
+            await client.channels.getSubscribers({ page: 0, size: 30, sort: 'RECENT' });
+
+            expect(mockGet).toHaveBeenCalledWith('/open/v1/channels/subscribers', {
+                params: { page: 0, size: 30, sort: 'RECENT' },
+            });
+        });
+
+        it('gets channel managers with READ:CHANNEL.', async () => {
+            const client = new CimeClient({ accessToken: 'token', scopes: ['READ:CHANNEL'] });
+            mockGet.mockResolvedValueOnce({ data: [] });
+
+            await client.channels.getManagers();
+
+            expect(mockGet).toHaveBeenCalledWith('/open/v1/channels/streaming-roles');
+        });
+    });
+
+    describe('live', () => {
+        it('gets public live list.', async () => {
+            const client = new CimeClient({ clientId: 'id', clientSecret: 'secret' });
+            mockGet.mockResolvedValueOnce({ data: [], page: { next: null } });
+
+            await client.live.getLives({ size: 10, next: 'cursor' });
+
+            expect(mockGet).toHaveBeenCalledWith('/open/v1/lives', {
+                params: { size: 10, next: 'cursor' },
+            });
+        });
+
+        it('gets and updates live settings with the required scopes.', async () => {
+            const client = new CimeClient({
+                accessToken: 'token',
+                scopes: ['READ:LIVE_STREAM_SETTINGS', 'WRITE:LIVE_STREAM_SETTINGS'],
+            });
+            mockGet.mockResolvedValueOnce({ defaultLiveTitle: 'title', category: null, tags: [] });
+            mockPatch.mockResolvedValueOnce(undefined);
+
+            await client.live.getSettings();
+            await client.live.updateSettings({ defaultLiveTitle: 'next title', categoryId: null });
+
+            expect(mockGet).toHaveBeenCalledWith('/open/v1/lives/setting');
+            expect(mockPatch).toHaveBeenCalledWith('/open/v1/lives/setting', {
+                defaultLiveTitle: 'next title',
+                categoryId: null,
+            });
+        });
+
+        it('gets stream key with READ:LIVE_STREAM_KEY.', async () => {
+            const client = new CimeClient({ accessToken: 'token', scopes: ['READ:LIVE_STREAM_KEY'] });
+            mockGet.mockResolvedValueOnce({ streamKey: 'stream-key' });
+
+            await client.live.getStreamKey();
+
+            expect(mockGet).toHaveBeenCalledWith('/open/v1/streams/key');
+        });
+
+        it('gets public live status by channel ID.', async () => {
+            const client = new CimeClient({ clientId: 'id', clientSecret: 'secret' });
+            mockGet.mockResolvedValueOnce({ isLive: true });
+
+            await client.live.getLiveStatus('channel-id');
+
+            expect(mockGet).toHaveBeenCalledWith('/v1/channel-id/live-status');
+        });
+    });
+
+    describe('chat', () => {
+        it('gets and updates chat settings with the required scopes.', async () => {
+            const client = new CimeClient({
+                accessToken: 'token',
+                scopes: ['READ:LIVE_CHAT_SETTINGS', 'WRITE:LIVE_CHAT_SETTINGS'],
+            });
+            mockGet.mockResolvedValueOnce({ chatAllowedGroup: 'ALL' });
+            mockPut.mockResolvedValueOnce(undefined);
+
+            await client.chat.getSettings();
+            await client.chat.updateSettings({ chatAllowedGroup: 'FOLLOWER', chatSlowModeSec: 5 });
+
+            expect(mockGet).toHaveBeenCalledWith('/open/v1/chats/settings');
+            expect(mockPut).toHaveBeenCalledWith('/open/v1/chats/settings', {
+                chatAllowedGroup: 'FOLLOWER',
+                chatSlowModeSec: 5,
+            });
+        });
+
+        it('sends messages with senderType.', async () => {
+            const client = new CimeClient({ accessToken: 'token', scopes: ['WRITE:LIVE_CHAT'] });
+            mockPost.mockResolvedValueOnce({ messageId: 'message-id' });
+
+            const result = await client.chat.sendMessage({ message: 'hello', senderType: 'USER' });
+
+            expect(mockPost).toHaveBeenCalledWith('/open/v1/chats/send', {
+                message: 'hello',
+                senderType: 'USER',
+            });
+            expect(result).toEqual({ messageId: 'message-id' });
+        });
+
+        it('requires message or messageId when registering notices.', async () => {
+            const client = new CimeClient({ accessToken: 'token', scopes: ['WRITE:LIVE_CHAT_NOTICE'] });
+
+            await expect(client.chat.registerNotice({})).rejects.toThrow(
+                /registerNotice requires either "message" or "messageId"/,
             );
             expect(mockPost).not.toHaveBeenCalled();
         });
 
-        it('DropsAPI.getCampaigns()가 state 배열을 쉼표로 구분된 문자열로 변환해야 합니다.', async () => {
+        it('registers chat notice with a message.', async () => {
+            const client = new CimeClient({ accessToken: 'token', scopes: ['WRITE:LIVE_CHAT_NOTICE'] });
+            mockPost.mockResolvedValueOnce(undefined);
+
+            await client.chat.registerNotice({ message: 'notice' });
+
+            expect(mockPost).toHaveBeenCalledWith('/open/v1/chats/notice', { message: 'notice' });
+        });
+    });
+
+    describe('categories', () => {
+        it('searches categories.', async () => {
+            const client = new CimeClient({ clientId: 'id', clientSecret: 'secret' });
+            mockGet.mockResolvedValueOnce({ data: [] });
+
+            await client.categories.searchCategories({ keyword: 'game', size: 20 });
+
+            expect(mockGet).toHaveBeenCalledWith('/open/v1/categories/search', {
+                params: { keyword: 'game', size: 20 },
+            });
+        });
+    });
+
+    describe('restrict', () => {
+        it('restricts and unrestricts users with WRITE:USER_BLOCK.', async () => {
+            const client = new CimeClient({ accessToken: 'token', scopes: ['WRITE:USER_BLOCK'] });
+            mockPost.mockResolvedValueOnce(undefined);
+            mockDelete.mockResolvedValueOnce(undefined);
+
+            await client.restrict.restrictUser({ targetChannelId: 'target-id' });
+            await client.restrict.unrestrictUser({ targetChannelId: 'target-id' });
+
+            expect(mockPost).toHaveBeenCalledWith('/open/v1/restrict-channels', {
+                targetChannelId: 'target-id',
+            });
+            expect(mockDelete).toHaveBeenCalledWith('/open/v1/restrict-channels', {
+                data: { targetChannelId: 'target-id' },
+            });
+        });
+
+        it('gets restricted users with READ:USER_BLOCK.', async () => {
+            const client = new CimeClient({ accessToken: 'token', scopes: ['READ:USER_BLOCK'] });
+            mockGet.mockResolvedValueOnce({ data: [], page: { next: null } });
+
+            await client.restrict.getRestrictedUsers({ size: 20, next: 'cursor' });
+
+            expect(mockGet).toHaveBeenCalledWith('/open/v1/restrict-channels', {
+                params: { size: 20, next: 'cursor' },
+            });
+        });
+    });
+
+    describe('sessions', () => {
+        it('creates USER and CLIENT sessions.', async () => {
+            const client = new CimeClient({ accessToken: 'token' });
+            mockGet.mockResolvedValueOnce({ url: 'wss://example.com?sessionKey=user' });
+            mockGet.mockResolvedValueOnce({ url: 'wss://example.com?sessionKey=client' });
+
+            await client.sessions.createSession('USER');
+            await client.sessions.createSession('CLIENT');
+
+            expect(mockGet).toHaveBeenNthCalledWith(1, '/open/v1/sessions/auth');
+            expect(mockGet).toHaveBeenNthCalledWith(2, '/open/v1/sessions/auth/client');
+        });
+
+        it('subscribes and unsubscribes events with sessionKey.', async () => {
+            const client = new CimeClient({ accessToken: 'token' });
+            mockPost.mockResolvedValue(undefined);
+
+            await client.sessions.subscribeEvent('donation', 'session-key');
+            await client.sessions.unsubscribeEvent('donation', 'session-key');
+
+            expect(mockPost).toHaveBeenNthCalledWith(1, '/open/v1/sessions/events/subscribe/donation', null, {
+                params: { sessionKey: 'session-key' },
+            });
+            expect(mockPost).toHaveBeenNthCalledWith(2, '/open/v1/sessions/events/unsubscribe/donation', null, {
+                params: { sessionKey: 'session-key' },
+            });
+        });
+    });
+
+    describe('drops', () => {
+        it('gets campaigns and converts state arrays into comma-separated query params.', async () => {
             const client = new CimeClient({ clientId: 'id', clientSecret: 'secret' });
             mockGet.mockResolvedValueOnce({ data: [] });
 
@@ -129,79 +376,99 @@ describe('Cime SDK - Unit Tests', () => {
             });
         });
 
-        it('DropsAPI.getRewardClaims()와 updateRewardClaims()가 문서 엔드포인트를 호출해야 합니다.', async () => {
+        it('gets reward claims and converts claimId arrays into comma-separated query params.', async () => {
             const client = new CimeClient({ clientId: 'id', clientSecret: 'secret' });
             mockGet.mockResolvedValueOnce({ data: [] });
-            mockPut.mockResolvedValueOnce({ data: [] });
 
-            await client.drops.getRewardClaims({ claimId: ['123', '124'], fulfillmentState: 'CLAIMED' });
-            await client.drops.updateRewardClaims({ claimIds: ['123', '124'], fulfillmentState: 'FULFILLED' });
+            await client.drops.getRewardClaims({
+                claimId: ['123', '124'],
+                fulfillmentState: 'CLAIMED',
+                campaignId: 'campaign-id',
+            });
 
             expect(mockGet).toHaveBeenCalledWith('/open/v1/drops/reward-claims', {
-                params: { claimId: '123,124', fulfillmentState: 'CLAIMED' },
+                params: {
+                    claimId: '123,124',
+                    fulfillmentState: 'CLAIMED',
+                    campaignId: 'campaign-id',
+                },
             });
-            expect(mockPut).toHaveBeenCalledWith('/open/v1/drops/reward-claims', {
-                claimIds: ['123', '124'],
+        });
+
+        it('updates reward claim fulfillment state.', async () => {
+            const client = new CimeClient({ clientId: 'id', clientSecret: 'secret' });
+            mockPut.mockResolvedValueOnce({ data: [{ status: 'SUCCESS', ids: ['123'] }] });
+
+            const result = await client.drops.updateRewardClaims({
+                claimIds: ['123'],
                 fulfillmentState: 'FULFILLED',
             });
+
+            expect(mockPut).toHaveBeenCalledWith('/open/v1/drops/reward-claims', {
+                claimIds: ['123'],
+                fulfillmentState: 'FULFILLED',
+            });
+            expect(result).toEqual({ data: [{ status: 'SUCCESS', ids: ['123'] }] });
         });
     });
 
-    describe('4. OAuth 자동화 및 토큰 갱신', () => {
-        it('authorize() 호출 시 Authorization Code로 토큰을 발급받아야 합니다.', async () => {
-            const client = new CimeClient({ clientId: 'my_id', clientSecret: 'my_secret' });
-            
-            mockPost.mockResolvedValueOnce({
-                accessToken: 'new_access_token',
-                refreshToken: 'new_refresh_token',
-                expiresIn: 3600,
-                scope: 'READ:USER',
-            });
-
-            const result = await client.authorize('test_auth_code');
-
-            // 정확한 파라미터로 POST 요청이 갔는지 확인
-            expect(mockPost).toHaveBeenCalledWith('/auth/v1/token', {
-                grantType: 'authorization_code',
-                clientId: 'my_id',
-                clientSecret: 'my_secret',
-                code: 'test_auth_code'
-            });
-
-            // 결과값이 올바르게 반환되었는지 확인
-            expect(result.accessToken).toBe('new_access_token');
-        });
-    });
-
-    describe('5. 유틸리티 함수 검증 (chatUtils)', () => {
-        it('renderChatEmojisToHTML가 토큰이 없는 메시지를 그대로 반환해야 합니다.', () => {
-            const chatData = { content: '일반 텍스트 메시지', emojis: {} };
-            const result = renderChatEmojisToHTML(chatData);
-            expect(result).toBe('일반 텍스트 메시지');
-        });
-
-        it('renderChatEmojisToHTML가 이모티콘 토큰을 정확히 img 태그로 치환해야 합니다.', () => {
-            const chatData = {
-                content: '안녕하세요 :smile-token: 반갑습니다!',
-                emojis: { ':smile-token:': 'https://example.com/smile.webp' },
+    describe('event payload types', () => {
+        it('supports CHEERING donation fields.', () => {
+            const donation: CimeDonationEventData = {
+                donationType: 'CHEERING',
+                channelId: 'channel-id',
+                donatorChannelId: 'donator-id',
+                donatorNickname: 'nickname',
+                donatorBadges: [{ id: 'badge-id', name: 'badge', imageUrl: 'https://example.com/badge.webp' }],
+                payAmount: '80',
+                donationText: '',
+                emojis: {},
+                cheeringItems: [
+                    {
+                        cnt: 3,
+                        type: 'CONCERT_1',
+                        skinType: 'CONCERT',
+                        amount: 10,
+                        imageUrl: 'https://example.com/item.webp',
+                        overlayImageUrl: 'https://example.com/item-overlay.webp',
+                    },
+                ],
             };
 
-            const result = renderChatEmojisToHTML(chatData, 'custom-emoji');
-            
+            expect(donation.cheeringItems?.[0].type).toBe('CONCERT_1');
+        });
+    });
+
+    describe('chatUtils', () => {
+        it('returns messages without emoji tokens unchanged.', () => {
+            const result = renderChatEmojisToHTML({ content: 'plain message', emojis: {} });
+
+            expect(result).toBe('plain message');
+        });
+
+        it('replaces emoji tokens with img tags.', () => {
+            const result = renderChatEmojisToHTML(
+                {
+                    content: 'hello :smile-token:',
+                    emojis: { ':smile-token:': 'https://example.com/smile.webp' },
+                },
+                'custom-emoji',
+            );
+
             expect(result).toBe(
-                '안녕하세요 <img src="https://example.com/smile.webp" alt=":smile-token:" class="custom-emoji" /> 반갑습니다!'
+                'hello <img src="https://example.com/smile.webp" alt=":smile-token:" class="custom-emoji" />',
             );
         });
 
-        it('renderChatEmojisToHTML가 정규식 특수문자가 포함된 토큰도 JavaScript 버그 없이 안전하게 치환해야 합니다.', () => {
-            const chatData = {
-                content: '특수문자 [테스트] ^_^ :$$complex-token$$: 치환',
+        it('handles regex special characters in emoji tokens.', () => {
+            const result = renderChatEmojisToHTML({
+                content: 'special :$$complex-token$$: token',
                 emojis: { ':$$complex-token$$:': 'https://example.com/complex.webp' },
-            };
+            });
 
-            const result = renderChatEmojisToHTML(chatData);
-            
-            expect(result).toContain('<img src="https://example.com/complex.webp" alt=":$$complex-token$$:" class="cime-emoji" />');
+            expect(result).toContain(
+                '<img src="https://example.com/complex.webp" alt=":$$complex-token$$:" class="cime-emoji" />',
+            );
         });
     });
 });
