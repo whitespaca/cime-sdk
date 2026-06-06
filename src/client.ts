@@ -9,6 +9,7 @@ import { ChatAPI } from './api/chat';
 import { CategoriesAPI } from './api/categories';
 import { RestrictAPI } from './api/restrict';
 import { SessionsAPI } from './api/sessions';
+import { DropsAPI } from './api/drops';
 import { CimeEventClient } from './ws/CimeEventClient';
 
 /**
@@ -26,9 +27,10 @@ export class CimeClient {
     public readonly categories: CategoriesAPI;
     public readonly restrict: RestrictAPI;
     public readonly sessions: SessionsAPI;
+    public readonly drops: DropsAPI;
 
     constructor(options: CimeClientOptions) {
-        // [버그 수정됨] accessToken이 없고, (clientId 또는 clientSecret이 없을 때) 에러를 발생시킵니다.
+        // accessToken or a complete client credential pair is required.
         if (!options.accessToken && (!options.clientId || !options.clientSecret)) {
             throw new Error('[CimeClient] Authentication credentials (accessToken OR clientId/Secret) are required.');
         }
@@ -44,11 +46,12 @@ export class CimeClient {
         this.categories = new CategoriesAPI(this.httpClient);
         this.restrict = new RestrictAPI(this.httpClient, this.options);
         this.sessions = new SessionsAPI(this.httpClient);
+        this.drops = new DropsAPI(this.httpClient);
     }
 
     public setAccessToken(token: string): void {
         this.options.accessToken = token;
-        // httpClient 내부의 options 참조는 객체 참조이므로 속성만 바꿔주면 다음 요청부터 자동으로 반영됩니다.
+        // The HTTP client keeps a reference to options, so future requests pick this up.
     }
 
     public setRefreshToken(token: string): void {

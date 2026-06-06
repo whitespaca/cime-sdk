@@ -7,7 +7,8 @@ export * from './categories';
 export * from './restrict';
 export * from './sessions';
 export * from './donation';
-export * from './subscription'; // 구독 타입 추가
+export * from './subscription'; // Subscription event types.
+export * from './drops';
 
 export interface CimeCommonResponse<T = unknown> {
     code: number;

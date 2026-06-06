@@ -15,7 +15,6 @@ export class CimeAPIError extends Error {
         this.name = 'CimeAPIError';
         this.statusCode = errorResponse.statusCode;
 
-        // TypeScript 환경에서 Custom Error 생성 시 prototype 체인을 수동으로 복구 (instanceof 정상 작동을 위함)
         Object.setPrototypeOf(this, CimeAPIError.prototype);
     }
 }

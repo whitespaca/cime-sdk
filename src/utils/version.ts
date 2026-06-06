@@ -57,5 +57,5 @@ function isNewerVersion(local: string, remote: string): boolean {
         if (r < l) return false;
     }
     
-    return false; // 완전히 동일한 버전
+    return false;
 }

@@ -1,24 +1,37 @@
-/**
- * 후원 유형 (채팅 후원 또는 영상 후원)
- */
-export type CimeDonationType = 'CHAT' | 'VIDEO';
+export type CimeDonationType = 'CHAT' | 'VIDEO' | 'CHEERING';
 
-/**
- * 실시간 DONATION 이벤트 수신 시 전달되는 데이터 페이로드
- */
+export interface CimeDonationBadge {
+    id: string;
+    name: string;
+    imageUrl: string;
+}
+
+export interface CimeCheeringItem {
+    cnt: number;
+    type: string;
+    skinType: string;
+    amount: number;
+    imageUrl: string;
+    overlayImageUrl: string;
+}
+
 export interface CimeDonationEventData {
-    /** 후원 유형 */
+    /** Donation type. */
     donationType: CimeDonationType;
-    /** 후원이 발생한 채널의 ID */
+    /** Channel ID where the donation occurred. */
     channelId: string;
-    /** 후원자의 채널 ID (익명 후원 시 null) */
+    /** Donator channel ID. Null for anonymous donations. */
     donatorChannelId: string | null;
-    /** 후원자 닉네임 (익명 후원 시 null) */
+    /** Donator nickname. Null for anonymous donations. */
     donatorNickname: string | null;
-    /** 후원 금액 (빔 단위, 정밀도 손실 방지를 위해 문자열 사용) */
+    /** Donator badges. Empty array when there are no badges. */
+    donatorBadges: CimeDonationBadge[];
+    /** Donation amount in beam units, kept as a string to avoid precision loss. */
     payAmount: string;
-    /** 후원 메시지 */
+    /** Donation message. Cheering donations always use an empty string. */
     donationText: string;
-    /** 이모티콘 토큰 -> 이미지 URL 매핑 객체 */
+    /** Emoji token to image URL mapping. */
     emojis: Record<string, string>;
+    /** Provided only for cheering donations. */
+    cheeringItems?: CimeCheeringItem[];
 }

@@ -117,19 +117,45 @@ describe('Cime SDK - Unit Tests', () => {
             );
             expect(mockPost).not.toHaveBeenCalled();
         });
+
+        it('DropsAPI.getCampaigns()가 state 배열을 쉼표로 구분된 문자열로 변환해야 합니다.', async () => {
+            const client = new CimeClient({ clientId: 'id', clientSecret: 'secret' });
+            mockGet.mockResolvedValueOnce({ data: [] });
+
+            await client.drops.getCampaigns({ page: 1, size: 50, state: ['ACTIVE', 'CLAIMABLE'] });
+
+            expect(mockGet).toHaveBeenCalledWith('/open/v1/drops/campaigns', {
+                params: { page: 1, size: 50, state: 'ACTIVE,CLAIMABLE' },
+            });
+        });
+
+        it('DropsAPI.getRewardClaims()와 updateRewardClaims()가 문서 엔드포인트를 호출해야 합니다.', async () => {
+            const client = new CimeClient({ clientId: 'id', clientSecret: 'secret' });
+            mockGet.mockResolvedValueOnce({ data: [] });
+            mockPut.mockResolvedValueOnce({ data: [] });
+
+            await client.drops.getRewardClaims({ claimId: ['123', '124'], fulfillmentState: 'CLAIMED' });
+            await client.drops.updateRewardClaims({ claimIds: ['123', '124'], fulfillmentState: 'FULFILLED' });
+
+            expect(mockGet).toHaveBeenCalledWith('/open/v1/drops/reward-claims', {
+                params: { claimId: '123,124', fulfillmentState: 'CLAIMED' },
+            });
+            expect(mockPut).toHaveBeenCalledWith('/open/v1/drops/reward-claims', {
+                claimIds: ['123', '124'],
+                fulfillmentState: 'FULFILLED',
+            });
+        });
     });
 
     describe('4. OAuth 자동화 및 토큰 갱신', () => {
         it('authorize() 호출 시 Authorization Code로 토큰을 발급받아야 합니다.', async () => {
             const client = new CimeClient({ clientId: 'my_id', clientSecret: 'my_secret' });
             
-            // 💡 [수정됨] AuthAPI가 `const { data }` 로 추출하므로 Mock 객체도 `data` 키로 한 번 감싸줍니다.
             mockPost.mockResolvedValueOnce({
-                data: {
-                    accessToken: 'new_access_token',
-                    refreshToken: 'new_refresh_token',
-                    expiresIn: 3600
-                }
+                accessToken: 'new_access_token',
+                refreshToken: 'new_refresh_token',
+                expiresIn: 3600,
+                scope: 'READ:USER',
             });
 
             const result = await client.authorize('test_auth_code');

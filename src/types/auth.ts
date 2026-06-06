@@ -24,8 +24,10 @@ export interface CimeTokenRequest {
     grantType: 'authorization_code' | 'refresh_token';
     clientId: string;
     clientSecret: string;
-    code?: string;         // grantType이 'authorization_code'일 때 필수
-    refreshToken?: string; // grantType이 'refresh_token'일 때 필수
+    /** grant_type이 'authorization_code'일 때 필수 */
+    code?: string;
+    /** grant_type이 'refresh_token'일 때 필수 */
+    refreshToken?: string;
 }
 
 /**
@@ -34,9 +36,9 @@ export interface CimeTokenRequest {
 export interface CimeTokenResponse {
     accessToken: string;
     refreshToken: string;
-    expiresIn: number;     // 초 단위 (기본 3600)
-    tokenType: string;     // 예: "Bearer"
-    scope: string;         // 발급된 스코프 목록 (공백으로 구분될 수 있음)
+    expiresIn: number;
+    tokenType: string;
+    scope: string;
 }
 
 /**
