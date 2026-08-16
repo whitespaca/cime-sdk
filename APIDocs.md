@@ -6,6 +6,7 @@
 
 - https://developers.ci.me/docs/overview
 - https://developers.ci.me/docs/updates
+- https://developers.ci.me/docs/authentication
 
 ## Client
 
@@ -25,6 +26,19 @@ const client = new CimeClient({
 
 ## auth
 
+### `client.auth.getAuthorizationUrl(options)`
+
+OAuth 동의 페이지 URL을 생성합니다. `state`는 콜백에서 반드시 검증해야 합니다.
+
+```ts
+const authorizationUrl = client.auth.getAuthorizationUrl({
+    redirectUri: 'https://your-app.com/oauth/callback',
+    state: crypto.randomUUID(),
+});
+```
+
+애플리케이션이 요청할 Scope는 URL이 아니라 씨미 개발자 포탈에서 설정합니다. 포탈에서 Scope를 바꾼 뒤에는 기존 사용자를 이 URL로 다시 보내 동의를 받아야 변경된 Scope가 새 토큰에 적용됩니다. 기존 Access Token과 Refresh Token은 발급 당시 Scope를 유지합니다.
+
 ### `client.auth.get(code)`
 
 Authorization Code로 토큰을 발급합니다.
@@ -43,10 +57,18 @@ const token = await client.auth.get('authorization-code');
 
 ### `client.auth.refresh(refreshToken)`
 
-Refresh Token으로 새 Access Token을 발급합니다.
+Refresh Token으로 새 Access Token을 발급하는 저수준 API입니다. 반환된 새 Refresh Token은 직접 저장해야 합니다.
 
 ```ts
 const token = await client.auth.refresh('refresh-token');
+```
+
+### `client.auth.revoke(token, tokenTypeHint)`
+
+Access Token 또는 Refresh Token을 취소합니다. 하나를 취소하면 같은 인증에 연결된 두 토큰이 모두 취소됩니다.
+
+```ts
+await client.auth.revoke('refresh-token', 'refresh_token');
 ```
 
 ### `client.authorize(code)`
@@ -56,6 +78,16 @@ Authorization Code로 토큰을 발급한 뒤, SDK 인스턴스의 `accessToken`
 ```ts
 const token = await client.authorize('authorization-code');
 ```
+
+### `client.refresh(refreshToken?)`
+
+저장된 Refresh Token으로 토큰을 갱신하고 새 `accessToken`, `refreshToken`, `scopes`를 SDK 인스턴스에 반영합니다. 인자를 생략하면 클라이언트 생성 시 전달했거나 직전 갱신에서 받은 Refresh Token을 사용합니다.
+
+```ts
+const token = await client.refresh();
+```
+
+Refresh Token은 1회용이며 갱신 응답마다 교체됩니다. 연속 갱신에는 `client.auth.refresh()`보다 새 토큰을 자동 저장하는 `client.refresh()` 사용을 권장합니다. Scope 변경은 Refresh로 반영되지 않으므로 사용자 재동의와 `client.authorize(code)` 호출이 필요합니다.
 
 ## users
 
@@ -431,6 +463,8 @@ await eventClient.subscribe('CHAT');
 await eventClient.subscribe('DONATION');
 await eventClient.subscribe('SUBSCRIPTION');
 ```
+
+`refreshToken`을 전달하면 재연결 시 `client.refresh()`와 같은 상태 저장형 갱신을 사용합니다. 갱신 응답의 새 Refresh Token이 다음 재연결에 사용되므로 이미 소비된 토큰을 재사용하지 않습니다.
 
 지원 이벤트:
 

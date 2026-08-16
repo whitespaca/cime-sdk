@@ -104,18 +104,22 @@ export class CimeClient {
      * @returns 실시간 이벤트 클라이언트 인스턴스
      */
     public createEventClient(options: CimeEventClientOptions): CimeEventClient {
-        if ((options.refreshToken || this.options.refreshToken) && !options.onTokenRefresh) {
-            options.onTokenRefresh = async () => {
+        const eventOptions = { ...options };
+
+        if (eventOptions.refreshToken && !eventOptions.onTokenRefresh) {
+            this.setRefreshToken(eventOptions.refreshToken);
+        }
+
+        if (this.options.refreshToken && !eventOptions.onTokenRefresh) {
+            eventOptions.onTokenRefresh = async () => {
                 try {
-                    const tokenInfo = await this.auth.refresh(options.refreshToken || this.options.refreshToken!);
-                    this.setAccessToken(tokenInfo.accessToken);
-                    this.setRefreshToken(tokenInfo.refreshToken);
+                    await this.refresh();
                 } catch (error) {
                     throw new Error('자동 토큰 갱신에 실패했습니다.');
                 }
             };
         }
-        return new CimeEventClient(this.sessions, options);
+        return new CimeEventClient(this.sessions, eventOptions);
     }
 
     /**
@@ -131,9 +135,32 @@ export class CimeClient {
         }
 
         const tokenResponse = await this.auth.get(code);
+        this.applyTokenResponse(tokenResponse);
+        return tokenResponse;
+    }
+
+    /**
+     * 저장된 Refresh Token을 한 번 사용해 토큰을 갱신하고, 응답으로 교체된 Refresh Token과
+     * Scope를 SDK 상태에 반영합니다.
+     *
+     * Refresh로는 개발자 포탈에서 변경한 Scope가 적용되지 않습니다. Scope가 바뀌었다면
+     * 사용자를 OAuth 동의 페이지로 다시 보내고 {@link authorize}를 호출해야 합니다.
+     *
+     * @param refreshToken 사용할 Refresh Token. 생략하면 클라이언트에 저장된 토큰을 사용합니다.
+     */
+    public async refresh(refreshToken: string | undefined = this.options.refreshToken): Promise<CimeTokenResponse> {
+        if (!refreshToken) {
+            throw new Error('[CimeClient] Token refresh requires a refreshToken.');
+        }
+
+        const tokenResponse = await this.auth.refresh(refreshToken);
+        this.applyTokenResponse(tokenResponse);
+        return tokenResponse;
+    }
+
+    private applyTokenResponse(tokenResponse: CimeTokenResponse): void {
         this.setAccessToken(tokenResponse.accessToken);
         this.setRefreshToken(tokenResponse.refreshToken);
-        this.setScopes(tokenResponse.scope.split(' '));
-        return tokenResponse;
+        this.setScopes(tokenResponse.scope.trim().split(/\s+/).filter(Boolean));
     }
 }

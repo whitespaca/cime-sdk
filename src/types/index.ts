@@ -30,6 +30,8 @@ export interface CimeErrorResponse {
     statusCode: number;
     /** 사람이 읽을 수 있는 오류 메시지입니다. */
     message: string;
+    /** 인증 오류 등에서 반환되는 선택적인 오류 이름입니다. */
+    error?: string;
 }
 
 /**

@@ -51,6 +51,22 @@ dotenv와 함께 사용하는 것을 매우 권장합니다.
 
 이외 API에 대한 사용법은 [APIDocs](APIDocs.md)를 참고해주세요.
 
+### OAuth Scope 변경과 토큰 갱신
+
+씨미 개발자 포탈에서 애플리케이션 Scope를 변경해도 기존 토큰에는 즉시 반영되지 않습니다. 기존 사용자가 OAuth 동의 페이지에서 다시 동의한 뒤 새 Authorization Code를 `client.authorize(code)`로 교환해야 합니다.
+
+```javascript
+const authorizationUrl = client.auth.getAuthorizationUrl({
+    redirectUri: 'https://your-app.com/oauth/callback',
+    state: crypto.randomUUID(),
+});
+
+// 콜백에서 state 검증 후
+await client.authorize(code);
+```
+
+Refresh Token은 한 번 사용하면 새 토큰으로 교체됩니다. SDK 상태와 교체된 토큰을 함께 갱신하려면 `client.refresh()`를 사용하세요.
+
 ---
 
 ## 🤝 기여하기

@@ -18,6 +18,16 @@ export type CimeScope =
     | 'WRITE:LIVE_CHAT_NOTICE';
 
 /**
+ * OAuth 사용자 동의 페이지 URL을 만들 때 사용하는 옵션입니다.
+ */
+export interface CimeAuthorizationUrlOptions {
+    /** 개발자 포탈에 등록한 OAuth Redirect URI입니다. */
+    redirectUri: string;
+    /** OAuth 요청과 콜백을 연결하고 CSRF를 방지하기 위한 임의 문자열입니다. */
+    state: string;
+}
+
+/**
  * 토큰 발급/갱신 요청 인터페이스
  */
 export interface CimeTokenRequest {
@@ -36,10 +46,14 @@ export interface CimeTokenRequest {
 export interface CimeTokenResponse {
     accessToken: string;
     refreshToken: string;
-    expiresIn: number;
+    /** 공식 API는 문자열로 반환하며, 기존 응답과의 호환을 위해 숫자도 허용합니다. */
+    expiresIn: string | number;
     tokenType: string;
     scope: string;
 }
+
+/** OAuth 토큰 취소 시 지정하는 토큰 종류입니다. */
+export type CimeTokenTypeHint = 'access_token' | 'refresh_token';
 
 /**
  * 토큰 취소 요청 인터페이스
@@ -48,5 +62,5 @@ export interface CimeRevokeTokenRequest {
     clientId: string;
     clientSecret: string;
     token: string;
-    tokenTypeHint: 'access_token' | 'refresh_token';
+    tokenTypeHint: CimeTokenTypeHint;
 }

@@ -38,7 +38,8 @@ export function createHttpClient(options: CimeClientOptions): AxiosInstance {
 
     client.interceptors.response.use(
         (response: AxiosResponse<CimeCommonResponse>) => {
-        return response.data.content as any;
+        // 토큰 취소처럼 성공해도 응답 바디가 없는 API를 지원합니다.
+        return response.data?.content as any;
         },
         (error: AxiosError<CimeErrorResponse>) => {
         if (error.response && error.response.data) {

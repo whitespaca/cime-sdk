@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CimeClient } from '../src/client';
-import type { CimeDonationEventData } from '../src/types';
+import type { CimeDonationEventData, CimeEventClientOptions } from '../src/types';
 import { renderChatEmojisToHTML } from '../src/utils/chatUtils';
 
 const mockGet = vi.fn();
@@ -89,9 +89,105 @@ describe('Cime SDK', () => {
             expect(token.accessToken).toBe('new-access-token');
             expect(message).toEqual({ messageId: 'message-id' });
         });
+
+        it('refresh() stores each rotated refresh token and synchronizes scopes.', async () => {
+            const client = new CimeClient({
+                clientId: 'id',
+                clientSecret: 'secret',
+                refreshToken: 'initial-refresh-token',
+            });
+
+            mockPost.mockResolvedValueOnce({
+                accessToken: 'access-token-1',
+                refreshToken: 'refresh-token-1',
+                expiresIn: '86400',
+                tokenType: 'Bearer',
+                scope: 'WRITE:LIVE_CHAT',
+            });
+            mockPost.mockResolvedValueOnce({ messageId: 'message-id' });
+            mockPost.mockResolvedValueOnce({
+                accessToken: 'access-token-2',
+                refreshToken: 'refresh-token-2',
+                expiresIn: '86400',
+                tokenType: 'Bearer',
+                scope: 'WRITE:LIVE_CHAT',
+            });
+
+            await client.refresh();
+            await client.chat.sendMessage({ message: 'hello', senderType: 'APP' });
+            await client.refresh();
+
+            expect(mockPost).toHaveBeenNthCalledWith(1, '/auth/v1/token', {
+                grantType: 'refresh_token',
+                clientId: 'id',
+                clientSecret: 'secret',
+                refreshToken: 'initial-refresh-token',
+            });
+            expect(mockPost).toHaveBeenNthCalledWith(3, '/auth/v1/token', {
+                grantType: 'refresh_token',
+                clientId: 'id',
+                clientSecret: 'secret',
+                refreshToken: 'refresh-token-1',
+            });
+        });
+
+        it('refresh() fails fast when no refresh token is available.', async () => {
+            const client = new CimeClient({ clientId: 'id', clientSecret: 'secret' });
+
+            await expect(client.refresh()).rejects.toThrow(/requires a refreshToken/);
+            expect(mockPost).not.toHaveBeenCalled();
+        });
+
+        it('uses the stateful refresh flow for automatic event reconnection.', async () => {
+            const client = new CimeClient({ clientId: 'id', clientSecret: 'secret' });
+            const options: CimeEventClientOptions = {
+                type: 'USER',
+                refreshToken: 'initial-refresh-token',
+            };
+            const refreshSpy = vi.spyOn(client, 'refresh').mockResolvedValue({
+                accessToken: 'next-access-token',
+                refreshToken: 'next-refresh-token',
+                expiresIn: '86400',
+                tokenType: 'Bearer',
+                scope: 'READ:LIVE_CHAT',
+            });
+
+            const eventClient = client.createEventClient(options);
+            const eventOptions = (eventClient as unknown as { options: CimeEventClientOptions }).options;
+            await eventOptions.onTokenRefresh?.();
+
+            expect(options.onTokenRefresh).toBeUndefined();
+            expect(refreshSpy).toHaveBeenCalledOnce();
+            expect(refreshSpy).toHaveBeenCalledWith();
+        });
     });
 
     describe('auth', () => {
+        it('builds a consent URL for initial authorization or reauthorization.', () => {
+            const client = new CimeClient({ clientId: 'client id', clientSecret: 'secret' });
+
+            const authorizationUrl = new URL(client.auth.getAuthorizationUrl({
+                redirectUri: 'https://example.com/oauth/callback',
+                state: 'random-state',
+            }));
+
+            expect(authorizationUrl.origin + authorizationUrl.pathname).toBe(
+                'https://ci.me/auth/openapi/account-interlock',
+            );
+            expect(authorizationUrl.searchParams.get('clientId')).toBe('client id');
+            expect(authorizationUrl.searchParams.get('redirectUri')).toBe('https://example.com/oauth/callback');
+            expect(authorizationUrl.searchParams.get('state')).toBe('random-state');
+        });
+
+        it('fails fast when building a consent URL without a client ID.', () => {
+            const client = new CimeClient({ accessToken: 'token' });
+
+            expect(() => client.auth.getAuthorizationUrl({
+                redirectUri: 'https://example.com/oauth/callback',
+                state: 'random-state',
+            })).toThrow(/clientId/);
+        });
+
         it('get() calls the token endpoint with authorization_code grant.', async () => {
             const client = new CimeClient({ clientId: 'id', clientSecret: 'secret' });
             mockPost.mockResolvedValueOnce({ accessToken: 'token' });
@@ -120,6 +216,20 @@ describe('Cime SDK', () => {
                 refreshToken: 'refresh-token',
             });
             expect(result).toEqual({ accessToken: 'next-token' });
+        });
+
+        it('revoke() calls the token revocation endpoint.', async () => {
+            const client = new CimeClient({ clientId: 'id', clientSecret: 'secret' });
+            mockPost.mockResolvedValueOnce(undefined);
+
+            await client.auth.revoke('refresh-token', 'refresh_token');
+
+            expect(mockPost).toHaveBeenCalledWith('/auth/v1/token/revoke', {
+                clientId: 'id',
+                clientSecret: 'secret',
+                token: 'refresh-token',
+                tokenTypeHint: 'refresh_token',
+            });
         });
 
         it('fails fast when OAuth client credentials are missing.', async () => {
